@@ -48,6 +48,7 @@
 				"startWindowIconId":	16777254,
 				"startWindowBackgroundId":	16777227
 			}],
+		"requestPermissions":	[],
 		"packageName":	"entry",
 		"virtualMachine":	"ark12.0.6.0",
 		"compileMode":	"esmodule",

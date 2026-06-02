@@ -4,7 +4,11 @@ if (!("finalizeConstruction" in ViewPU.prototype)) {
 interface HomePage_Params {
     inputValue?: string;
     calValue?: string;
+    currentTheme?: ThemeType;
+    showMenu?: boolean;
     expressions?: Array<string>;
+    themeManager?;
+    historyManager?;
 }
 import Logger from "@bundle:com.example.simplecalculator/entry/ets/common/util/Logger";
 import CalculateUtil from "@bundle:com.example.simplecalculator/entry/ets/common/util/CalculateUtil";
@@ -12,6 +16,10 @@ import CheckEmptyUtil from "@bundle:com.example.simplecalculator/entry/ets/commo
 import keysModel from "@bundle:com.example.simplecalculator/entry/ets/viewmodel/PresskeysViewModel";
 import type { PressKeysBean } from '../viewmodel/PressKeysItem';
 import { CommonConstants, Symbol } from "@bundle:com.example.simplecalculator/entry/ets/common/constants/CommonConstants";
+import ThemeManagerUtil, { ThemeType } from "@bundle:com.example.simplecalculator/entry/ets/common/util/ThemeManagerUtil";
+import HistoryManagerUtil from "@bundle:com.example.simplecalculator/entry/ets/common/util/HistoryManagerUtil";
+import router from "@ohos:router";
+import type common from "@ohos:app.ability.common";
 class HomePage extends ViewPU {
     constructor(parent, params, __localStorage, elmtId = -1, paramsLambda = undefined, extraInfo) {
         super(parent, __localStorage, elmtId, extraInfo);
@@ -20,7 +28,11 @@ class HomePage extends ViewPU {
         }
         this.__inputValue = new ObservedPropertySimplePU('', this, "inputValue");
         this.__calValue = new ObservedPropertySimplePU('', this, "calValue");
+        this.__currentTheme = new ObservedPropertySimplePU(ThemeType.LIGHT, this, "currentTheme");
+        this.__showMenu = new ObservedPropertySimplePU(false, this, "showMenu");
         this.expressions = [];
+        this.themeManager = ThemeManagerUtil;
+        this.historyManager = HistoryManagerUtil;
         this.setInitiallyProvidedValue(params);
         this.finalizeConstruction();
     }
@@ -31,8 +43,20 @@ class HomePage extends ViewPU {
         if (params.calValue !== undefined) {
             this.calValue = params.calValue;
         }
+        if (params.currentTheme !== undefined) {
+            this.currentTheme = params.currentTheme;
+        }
+        if (params.showMenu !== undefined) {
+            this.showMenu = params.showMenu;
+        }
         if (params.expressions !== undefined) {
             this.expressions = params.expressions;
+        }
+        if (params.themeManager !== undefined) {
+            this.themeManager = params.themeManager;
+        }
+        if (params.historyManager !== undefined) {
+            this.historyManager = params.historyManager;
         }
     }
     updateStateVars(params: HomePage_Params) {
@@ -40,10 +64,14 @@ class HomePage extends ViewPU {
     purgeVariableDependenciesOnElmtId(rmElmtId) {
         this.__inputValue.purgeDependencyOnElmtId(rmElmtId);
         this.__calValue.purgeDependencyOnElmtId(rmElmtId);
+        this.__currentTheme.purgeDependencyOnElmtId(rmElmtId);
+        this.__showMenu.purgeDependencyOnElmtId(rmElmtId);
     }
     aboutToBeDeleted() {
         this.__inputValue.aboutToBeDeleted();
         this.__calValue.aboutToBeDeleted();
+        this.__currentTheme.aboutToBeDeleted();
+        this.__showMenu.aboutToBeDeleted();
         SubscriberManager.Get().delete(this.id__());
         this.aboutToBeDeletedInternal();
     }
@@ -61,13 +89,42 @@ class HomePage extends ViewPU {
     set calValue(newValue: string) {
         this.__calValue.set(newValue);
     }
+    private __currentTheme: ObservedPropertySimplePU<ThemeType>;
+    get currentTheme() {
+        return this.__currentTheme.get();
+    }
+    set currentTheme(newValue: ThemeType) {
+        this.__currentTheme.set(newValue);
+    }
+    private __showMenu: ObservedPropertySimplePU<boolean>;
+    get showMenu() {
+        return this.__showMenu.get();
+    }
+    set showMenu(newValue: boolean) {
+        this.__showMenu.set(newValue);
+    }
     private expressions: Array<string>;
+    private themeManager;
+    private historyManager;
+    aboutToAppear() {
+        this.currentTheme = this.themeManager.getCurrentTheme();
+        // Initialize history manager
+        try {
+            const context = getContext(this) as common.UIAbilityContext;
+            this.historyManager.init(context);
+        }
+        catch (error) {
+            console.error('Failed to initialize history manager: ' + JSON.stringify(error));
+        }
+    }
     initialRender() {
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Column.create();
             Column.height(CommonConstants.FULL_PERCENT);
             Column.backgroundColor({ "id": 16777223, "type": 10001, params: [], "bundleName": "com.example.simplecalculator", "moduleName": "entry" });
         }, Column);
+        // Top navigation bar with menu
+        this.TopNavigationBar.bind(this)();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Column.create();
             Column.width(CommonConstants.FULL_PERCENT);
@@ -413,6 +470,9 @@ class HomePage extends ViewPU {
             return false;
         }
         this.calValue = calResult;
+        // Save to history
+        const expression = this.expressions.join(' ');
+        await this.historyManager.addHistory(expression, calResult);
         return true;
     }
     /**
@@ -455,6 +515,122 @@ class HomePage extends ViewPU {
             deepExpressions[index] = this.resultFormat(item);
         });
         this.inputValue = deepExpressions.join('');
+    }
+    /**
+     * Top navigation bar with menu
+     */
+    TopNavigationBar(parent = null) {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Row.create();
+            Row.width('100%');
+            Row.height(56);
+            Row.padding({ left: 8, right: 8 });
+            Row.backgroundColor(this.themeManager.getBackgroundColor());
+        }, Row);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            // Menu button
+            Button.createWithChild({ type: ButtonType.Circle });
+            // Menu button
+            Button.width(44);
+            // Menu button
+            Button.height(44);
+            // Menu button
+            Button.backgroundColor(Color.Transparent);
+            // Menu button
+            Button.onClick(() => {
+                this.showMenu = !this.showMenu;
+            });
+        }, Button);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Text.create('☰');
+            Text.fontSize(24);
+            Text.fontColor(this.themeManager.getTextColor());
+        }, Text);
+        Text.pop();
+        // Menu button
+        Button.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            // Title
+            Text.create('简易计算器');
+            // Title
+            Text.fontSize(20);
+            // Title
+            Text.fontWeight(FontWeight.Bold);
+            // Title
+            Text.fontColor(this.themeManager.getTextColor());
+            // Title
+            Text.layoutWeight(1);
+            // Title
+            Text.textAlign(TextAlign.Center);
+        }, Text);
+        // Title
+        Text.pop();
+        Row.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            If.create();
+            // Dropdown menu
+            if (this.showMenu) {
+                this.ifElseBranchUpdateFunction(0, () => {
+                    this.DropDownMenu.bind(this)();
+                });
+            }
+            else /**
+             * Dropdown menu component
+             */ {
+                this.ifElseBranchUpdateFunction(1, () => {
+                });
+            }
+        }, If);
+        If.pop();
+    }
+    /**
+     * Dropdown menu component
+     */
+    DropDownMenu(parent = null) {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create();
+            Column.width('200vp');
+            Column.backgroundColor(this.themeManager.getButtonBackgroundColor());
+            Column.borderRadius(12);
+            Column.shadow({ radius: 8, color: '#33000000', offsetX: 0, offsetY: 4 });
+            Column.position({ x: '8vp', y: '56vp' });
+            Column.zIndex(999);
+        }, Column);
+        // Scientific Calculator
+        this.MenuItem.bind(this)('🧪 科学计算器', () => {
+            this.showMenu = false;
+            router.pushUrl({ url: 'pages/ScientificCalculatorPage' });
+        });
+        // History
+        this.MenuItem.bind(this)('📜 计算历史', () => {
+            this.showMenu = false;
+            router.pushUrl({ url: 'pages/HistoryPage' });
+        });
+        // Unit Converter
+        this.MenuItem.bind(this)('📏 单位转换', () => {
+            this.showMenu = false;
+            router.pushUrl({ url: 'pages/UnitConverterPage' });
+        });
+        Column.pop();
+    }
+    /**
+     * Menu item component
+     */
+    MenuItem(text: string, onClick: () => void, parent = null) {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Row.create();
+            Row.width('100%');
+            Row.height(48);
+            Row.padding({ left: 16, right: 16 });
+            Row.onClick(onClick);
+        }, Row);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Text.create(text);
+            Text.fontSize(16);
+            Text.fontColor(this.themeManager.getTextColor());
+        }, Text);
+        Text.pop();
+        Row.pop();
     }
     rerender() {
         this.updateDirtyElements();

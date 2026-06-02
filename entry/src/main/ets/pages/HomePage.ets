@@ -19,16 +19,38 @@ import CheckEmptyUtil from '../common/util/CheckEmptyUtil';
 import keysModel from '../viewmodel/PresskeysViewModel';
 import { PressKeysBean } from '../viewmodel/PressKeysItem';
 import { CommonConstants, Symbol } from '../common/constants/CommonConstants';
+import ThemeManagerUtil, { ThemeType } from '../common/util/ThemeManagerUtil';
+import HistoryManagerUtil from '../common/util/HistoryManagerUtil';
+import router from '@ohos.router';
+import common from '@ohos.app.ability.common';
 
 @Entry
 @Component
 struct HomePage {
   @State inputValue: string = '';
   @State calValue: string = '';
+  @State currentTheme: ThemeType = ThemeType.LIGHT;
+  @State showMenu: boolean = false;
   private expressions: Array<string> = [];
+  private themeManager = ThemeManagerUtil;
+  private historyManager = HistoryManagerUtil;
+
+  aboutToAppear() {
+    this.currentTheme = this.themeManager.getCurrentTheme();
+    // Initialize history manager
+    try {
+      const context = getContext(this) as common.UIAbilityContext;
+      this.historyManager.init(context);
+    } catch (error) {
+      console.error('Failed to initialize history manager: ' + JSON.stringify(error));
+    }
+  }
 
   build() {
     Column() {
+      // Top navigation bar with menu
+      this.TopNavigationBar();
+      
       Column() {
         TextInput({ text: this.resultFormat(this.inputValue) })
           .height(CommonConstants.FULL_PERCENT)
@@ -353,6 +375,11 @@ struct HomePage {
       return false;
     }
     this.calValue = calResult;
+    
+    // Save to history
+    const expression = this.expressions.join(' ');
+    await this.historyManager.addHistory(expression, calResult);
+    
     return true;
   }
 
@@ -398,4 +425,88 @@ struct HomePage {
     });
     this.inputValue = deepExpressions.join('');
   }
+
+  /**
+   * Top navigation bar with menu
+   */
+  @Builder TopNavigationBar() {
+    Row() {
+      // Menu button
+      Button({ type: ButtonType.Circle }) {
+        Text('☰')
+          .fontSize(24)
+          .fontColor(this.themeManager.getTextColor())
+      }
+      .width(44)
+      .height(44)
+      .backgroundColor(Color.Transparent)
+      .onClick(() => {
+        this.showMenu = !this.showMenu;
+      })
+
+      // Title
+      Text('简易计算器')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.themeManager.getTextColor())
+        .layoutWeight(1)
+        .textAlign(TextAlign.Center)
+    }
+    .width('100%')
+    .height(56)
+    .padding({ left: 8, right: 8 })
+    .backgroundColor(this.themeManager.getBackgroundColor())
+
+    // Dropdown menu
+    if (this.showMenu) {
+      this.DropDownMenu();
+    }
+  }
+
+  /**
+   * Dropdown menu component
+   */
+  @Builder DropDownMenu() {
+    Column() {
+      // Scientific Calculator
+      this.MenuItem('🧪 科学计算器', () => {
+        this.showMenu = false;
+        router.pushUrl({ url: 'pages/ScientificCalculatorPage' });
+      });
+
+      // History
+      this.MenuItem('📜 计算历史', () => {
+        this.showMenu = false;
+        router.pushUrl({ url: 'pages/HistoryPage' });
+      });
+
+      // Unit Converter
+      this.MenuItem('📏 单位转换', () => {
+        this.showMenu = false;
+        router.pushUrl({ url: 'pages/UnitConverterPage' });
+      });
+    }
+    .width('200vp')
+    .backgroundColor(this.themeManager.getButtonBackgroundColor())
+    .borderRadius(12)
+    .shadow({ radius: 8, color: '#33000000', offsetX: 0, offsetY: 4 })
+    .position({ x: '8vp', y: '56vp' })
+    .zIndex(999)
+  }
+
+  /**
+   * Menu item component
+   */
+  @Builder MenuItem(text: string, onClick: () => void) {
+    Row() {
+      Text(text)
+        .fontSize(16)
+        .fontColor(this.themeManager.getTextColor())
+    }
+    .width('100%')
+    .height(48)
+    .padding({ left: 16, right: 16 })
+    .onClick(onClick)
+  }
+
 }

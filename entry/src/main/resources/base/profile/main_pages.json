@@ -1,5 +1,8 @@
 {
   "src": [
-    "pages/HomePage"
+    "pages/HomePage",
+    "pages/ScientificCalculatorPage",
+    "pages/HistoryPage",
+    "pages/UnitConverterPage"
   ]
 }

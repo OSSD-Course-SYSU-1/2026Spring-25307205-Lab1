@@ -51,6 +51,7 @@
 				]
 			}
 		],
+		"requestPermissions": [],
 		"packageName": "entry"
 	}
 }
