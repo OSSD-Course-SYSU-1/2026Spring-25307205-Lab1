@@ -1,0 +1,11 @@
+build/
+entry/build/
+.hvigor/
+.arts/
+*.hap
+*.hqf
+*.log
+report-*.json
+*.msgpack
+*.tsbuildinfo
+*.map
